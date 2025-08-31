@@ -27,6 +27,13 @@ class PostgreSQLConfig:
     timeout: int = 30
     cleanup_on_exit: bool = True
     
+    # Process monitoring settings
+    enable_monitoring: bool = False
+    auto_restart: bool = True
+    max_restart_attempts: int = 3
+    restart_delay: float = 5.0
+    monitoring_interval: float = 1.0
+    
     # PostgreSQL configuration
     postgres_config: Dict[str, Any] = field(default_factory=lambda: {
         "shared_preload_libraries": "",

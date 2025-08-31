@@ -8,18 +8,21 @@ import socket
 import subprocess
 import time
 import atexit
+import logging
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 import psutil
 
 from .config import PostgreSQLConfig
 from .downloader import PostgreSQLDownloader
+from .monitor import ProcessMonitor
 from .exceptions import (
     PostgreSQLEmbeddedError, 
     PostgreSQLInstallError, 
     PostgreSQLStartError, 
     PostgreSQLStopError,
-    PostgreSQLDatabaseError
+    PostgreSQLDatabaseError,
+    PostgreSQLMonitorError
 )
 
 
@@ -31,6 +34,12 @@ class PostgreSQL:
         self.downloader = PostgreSQLDownloader(self.config)
         self.process: Optional[subprocess.Popen] = None
         self._is_initialized = False
+        self._monitor: Optional[ProcessMonitor] = None
+        self._logger = logging.getLogger(__name__)
+        
+        # Initialize process monitor if enabled
+        if self.config.enable_monitoring:
+            self._monitor = ProcessMonitor(self.config, self._restart_postgresql)
         
         # Register cleanup on exit
         if self.config.cleanup_on_exit:
@@ -128,6 +137,11 @@ class PostgreSQL:
             # Wait for server to start
             self._wait_for_server_start()
             
+            # Start monitoring if enabled
+            if self._monitor:
+                self._monitor.start_monitoring(self.is_running)
+                self._logger.info("Started PostgreSQL process monitoring")
+            
         except Exception as e:
             raise PostgreSQLStartError(f"Failed to start PostgreSQL: {e}")
     
@@ -137,6 +151,11 @@ class PostgreSQL:
             return
             
         try:
+            # Stop monitoring first
+            if self._monitor:
+                self._monitor.stop_monitoring()
+                self._logger.info("Stopped PostgreSQL process monitoring")
+            
             if self.process:
                 # Send SIGTERM to gracefully shutdown
                 self.process.terminate()
@@ -315,6 +334,54 @@ class PostgreSQL:
             time.sleep(0.1)
         
         raise PostgreSQLStartError(f"PostgreSQL failed to start within {self.config.timeout} seconds")
+    
+    def _restart_postgresql(self) -> None:
+        """Internal method to restart PostgreSQL (used by monitor)"""
+        self._logger.info("Restarting PostgreSQL due to process death")
+        
+        # Clean up the dead process
+        if self.process:
+            self.process = None
+        
+        # Restart PostgreSQL
+        self.start()
+    
+    def enable_monitoring(self) -> None:
+        """Enable process monitoring for running PostgreSQL instance"""
+        if not self._monitor:
+            self._monitor = ProcessMonitor(self.config, self._restart_postgresql)
+        
+        if self.is_running():
+            self._monitor.start_monitoring(self.is_running)
+            self._logger.info("Enabled PostgreSQL process monitoring")
+        else:
+            raise PostgreSQLMonitorError("Cannot enable monitoring: PostgreSQL is not running")
+    
+    def disable_monitoring(self) -> None:
+        """Disable process monitoring"""
+        if self._monitor:
+            self._monitor.stop_monitoring()
+            self._logger.info("Disabled PostgreSQL process monitoring")
+    
+    def get_monitoring_status(self) -> dict:
+        """Get current monitoring status"""
+        if not self._monitor:
+            return {
+                "is_monitoring": False,
+                "monitoring_enabled": False,
+                "restart_count": 0,
+                "last_restart_time": None,
+                "max_restart_attempts": self.config.max_restart_attempts,
+                "auto_restart_enabled": self.config.auto_restart
+            }
+        
+        return self._monitor.get_status()
+    
+    def reset_restart_count(self) -> None:
+        """Reset the restart attempt counter"""
+        if self._monitor:
+            self._monitor.reset_restart_count()
+            self._logger.info("Reset restart attempt counter")
     
     def __enter__(self):
         """Context manager entry"""

@@ -26,3 +26,8 @@ class PostgreSQLStopError(PostgreSQLEmbeddedError):
 class PostgreSQLDatabaseError(PostgreSQLEmbeddedError):
     """Raised when database operations fail"""
     pass
+
+
+class PostgreSQLMonitorError(PostgreSQLEmbeddedError):
+    """Raised when process monitoring encounters errors"""
+    pass

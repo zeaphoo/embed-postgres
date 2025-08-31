@@ -8,7 +8,25 @@ and manages the database lifecycle.
 
 from .postgresql import PostgreSQL
 from .config import PostgreSQLConfig
-from .exceptions import PostgreSQLEmbeddedError, PostgreSQLInstallError, PostgreSQLStartError
+from .monitor import ProcessMonitor
+from .exceptions import (
+    PostgreSQLEmbeddedError, 
+    PostgreSQLInstallError, 
+    PostgreSQLStartError,
+    PostgreSQLStopError,
+    PostgreSQLDatabaseError,
+    PostgreSQLMonitorError
+)
 
 __version__ = "0.1.0"
-__all__ = ["PostgreSQL", "PostgreSQLConfig", "PostgreSQLEmbeddedError", "PostgreSQLInstallError", "PostgreSQLStartError"]
+__all__ = [
+    "PostgreSQL", 
+    "PostgreSQLConfig", 
+    "ProcessMonitor",
+    "PostgreSQLEmbeddedError", 
+    "PostgreSQLInstallError", 
+    "PostgreSQLStartError",
+    "PostgreSQLStopError",
+    "PostgreSQLDatabaseError",
+    "PostgreSQLMonitorError"
+]
